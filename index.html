@@ -1,0 +1,936 @@
+<!DOCTYPE html>
+<html lang="ja">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>保養所プライスボード</title>
+    <style>
+        :root {
+            --ink: #1c2b28;
+            --paper: #f6f3ea;
+            --line: #c9c2ac;
+            --moss: #2f5d4f;
+            --moss-dark: #1e3f35;
+            --clay: #a8562f;
+            --gold: #b8863b;
+            --panel: #ffffff;
+            --muted: #6b6357;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            background: var(--paper);
+            color: var(--ink);
+            font-family: "Hiragino Mincho ProN", "Yu Mincho", serif;
+            line-height: 1.6;
+        }
+
+        .wrap {
+            max-width: 1180px;
+            margin: 0 auto;
+            padding: 32px 20px 80px;
+        }
+
+        header.top {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-end;
+            border-bottom: 3px double var(--moss-dark);
+            padding-bottom: 18px;
+            margin-bottom: 28px;
+            gap: 24px;
+            flex-wrap: wrap;
+        }
+
+        header.top h1 {
+            font-size: 2.1rem;
+            margin: 0;
+            letter-spacing: .04em;
+            color: var(--moss-dark);
+            font-weight: 600;
+        }
+
+        header.top .sub {
+            font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", sans-serif;
+            color: var(--muted);
+            font-size: .85rem;
+            max-width: 420px;
+        }
+
+        section.panel {
+            background: var(--panel);
+            border: 1px solid var(--line);
+            border-radius: 2px;
+            padding: 24px;
+            margin-bottom: 24px;
+        }
+
+        section.panel h2 {
+            font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", sans-serif;
+            font-size: .95rem;
+            font-weight: 600;
+            margin: 0 0 16px;
+            color: var(--moss-dark);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        section.panel h2::before {
+            content: "";
+            width: 4px;
+            height: 16px;
+            background: var(--clay);
+            display: inline-block;
+        }
+
+        .grid-form {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 14px 18px;
+            font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", sans-serif;
+        }
+
+        .field {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .field label {
+            font-size: .75rem;
+            color: var(--muted);
+        }
+
+        .field input,
+        .field select {
+            font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", sans-serif;
+            padding: 8px 10px;
+            border: 1px solid var(--line);
+            border-radius: 2px;
+            font-size: .9rem;
+            background: #fff;
+            color: var(--ink);
+        }
+
+        .field input:focus,
+        .field select:focus {
+            outline: 2px solid var(--moss);
+            outline-offset: 1px;
+        }
+
+        .field.wide {
+            grid-column: span 2;
+        }
+
+        .appid-row {
+            display: flex;
+            gap: 10px;
+            align-items: flex-end;
+            flex-wrap: wrap;
+            margin-bottom: 16px;
+            padding-bottom: 16px;
+            border-bottom: 1px dashed var(--line);
+            font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", sans-serif;
+        }
+
+        .appid-row .field {
+            flex: 1;
+            min-width: 260px;
+        }
+
+        .appid-row a {
+            color: var(--moss);
+        }
+
+        .note {
+            font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", sans-serif;
+            font-size: .78rem;
+            color: var(--muted);
+            margin-top: 4px;
+        }
+
+        button {
+            font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", sans-serif;
+            cursor: pointer;
+            border: none;
+            border-radius: 2px;
+            padding: 10px 20px;
+            font-size: .9rem;
+            font-weight: 600;
+            letter-spacing: .02em;
+        }
+
+        button.primary {
+            background: var(--moss-dark);
+            color: #fff;
+        }
+
+        button.primary:hover {
+            background: var(--moss);
+        }
+
+        button.primary:disabled {
+            background: #a6aba1;
+            opacity: .5;
+            cursor: not-allowed;
+        }
+
+        button.ghost {
+            background: transparent;
+            border: 1px solid var(--line);
+            color: var(--ink);
+        }
+
+        button.ghost:hover {
+            border-color: var(--moss);
+            color: var(--moss-dark);
+        }
+
+        button.tiny {
+            padding: 4px 10px;
+            font-size: .72rem;
+        }
+
+        .status-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", sans-serif;
+            font-size: .82rem;
+            color: var(--muted);
+            margin: 16px 0 10px;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+
+        .progress-track {
+            width: 100%;
+            height: 4px;
+            background: var(--line);
+            border-radius: 2px;
+            overflow: hidden;
+            margin: 6px 0 0;
+        }
+
+        .progress-fill {
+            height: 100%;
+            width: 0%;
+            background: var(--clay);
+            transition: width .2s ease;
+        }
+
+        .filter-row {
+            display: flex;
+            gap: 14px;
+            flex-wrap: wrap;
+            align-items: flex-end;
+            margin-bottom: 14px;
+            font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", sans-serif;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", sans-serif;
+            font-size: .88rem;
+        }
+
+        thead th {
+            text-align: left;
+            padding: 10px 12px;
+            border-bottom: 2px solid var(--moss-dark);
+            color: var(--moss-dark);
+            font-weight: 600;
+            cursor: pointer;
+            white-space: nowrap;
+            user-select: none;
+        }
+
+        thead th:hover {
+            color: var(--clay);
+        }
+
+        thead th.active {
+            color: var(--clay);
+        }
+
+        thead th .arrow {
+            font-size: .7rem;
+            margin-left: 3px;
+        }
+
+        tbody tr {
+            border-bottom: 1px solid var(--line);
+        }
+
+        tbody tr:hover {
+            background: #efe9d8;
+        }
+
+        tbody td {
+            padding: 10px 12px;
+            vertical-align: middle;
+        }
+
+        td.name {
+            font-weight: 600;
+        }
+
+        td.pref {
+            color: var(--muted);
+            white-space: nowrap;
+        }
+
+        td.price {
+            font-variant-numeric: tabular-nums;
+            font-weight: 700;
+            color: var(--moss-dark);
+        }
+
+        td.price.none {
+            color: var(--muted);
+            font-weight: 400;
+        }
+
+        td.status .tag {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 20px;
+            font-size: .72rem;
+        }
+
+        .tag.ok {
+            background: #e2ede4;
+            color: var(--moss-dark);
+        }
+
+        .tag.ng {
+            background: #f1e4de;
+            color: var(--clay);
+        }
+
+        .tag.wait {
+            background: #eee9db;
+            color: var(--muted);
+        }
+
+        td a.rakuten-link {
+            color: var(--moss);
+            text-decoration: none;
+            border-bottom: 1px solid var(--moss);
+            font-size: .82rem;
+        }
+
+        td a.rakuten-link:hover {
+            color: var(--clay);
+            border-color: var(--clay);
+        }
+
+        .fix-input {
+            width: 90px;
+            padding: 3px 6px;
+            font-size: .72rem;
+            border: 1px solid var(--line);
+            border-radius: 2px;
+        }
+
+        .fix-row {
+            display: flex;
+            gap: 4px;
+            align-items: center;
+            margin-top: 4px;
+        }
+
+        footer {
+            margin-top: 40px;
+            font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", sans-serif;
+            font-size: .75rem;
+            color: var(--muted);
+            border-top: 1px solid var(--line);
+            padding-top: 16px;
+        }
+
+        @media (max-width:640px) {
+            header.top h1 {
+                font-size: 1.5rem;
+            }
+
+            .field.wide {
+                grid-column: span 1;
+            }
+
+            table,
+            thead,
+            tbody,
+            th,
+            td,
+            tr {
+                display: block;
+            }
+
+            thead {
+                display: none;
+            }
+
+            tbody tr {
+                padding: 10px 0;
+            }
+
+            tbody td {
+                display: flex;
+                justify-content: space-between;
+                padding: 4px 4px;
+            }
+
+            tbody td::before {
+                content: attr(data-label);
+                color: var(--muted);
+                font-size: .75rem;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="wrap">
+
+        <header class="top">
+            <div>
+                <h1>保養所プライスボード</h1>
+                <div class="sub">健保保養所・提携ホテルの料金を、日付を指定して横並びで見比べるための一覧です。料金は楽天トラベルの空室検索結果を参照します。</div>
+            </div>
+        </header>
+
+        <section class="panel">
+            <h2>楽天トラベルAPI設定</h2>
+            <div class="appid-row">
+                <div class="field">
+                    <label for="appId">楽天ウェブサービス アプリID</label>
+                    <input type="text" id="appId" placeholder="例) 1234567890123456789">
+                </div>
+                <div class="field">
+                    <label for="accessKey">アクセスキー</label>
+                    <input type="text" id="accessKey" placeholder="アプリ管理画面の「アクセスキー」欄">
+                </div>
+                <button class="ghost tiny" id="saveAppId" type="button">このセッションで使う</button>
+                <div class="note" style="flex-basis:100%;">
+                    未取得の場合は <a href="https://webservice.rakuten.co.jp/" target="_blank" rel="noopener">楽天ウェブサービス</a>
+                    で無料登録してください(即時発行)。アプリの管理画面に「アプリID」と「アクセスキー」の両方が表示されるので、両方コピーしてください。入力した値はこの画面を閉じると消えます。
+                </div>
+            </div>
+            <div class="note" id="testLinkWrap"
+                style="margin-bottom:16px;padding-bottom:16px;border-bottom:1px dashed var(--line);">
+                うまく取得できない場合は、まずこのリンクをクリックして、別タブでアプリID・アクセスキーの動作を確認してください:<br>
+                <button class="ghost tiny" id="testApiBtn" type="button"
+                    style="margin-top:6px;">APIキーをテスト(別タブで開く)</button>
+                <span id="testLinkResultHint" style="margin-left:8px;"></span>
+            </div>
+
+            <h2>検索条件</h2>
+            <div class="grid-form">
+                <div class="field">
+                    <label for="checkin">チェックイン</label>
+                    <input type="date" id="checkin">
+                </div>
+                <div class="field">
+                    <label for="checkout">チェックアウト</label>
+                    <input type="date" id="checkout">
+                </div>
+                <div class="field">
+                    <label for="adultNum">大人人数</label>
+                    <input type="number" id="adultNum" min="1" max="8" value="2">
+                </div>
+                <div class="field" style="justify-content:flex-end;">
+                    <button class="primary" id="searchBtn" type="button">この条件で料金を検索</button>
+                </div>
+            </div>
+            <div class="status-bar" id="statusBar" style="display:none;">
+                <span id="statusText">検索中…</span>
+                <span id="statusCount"></span>
+            </div>
+            <div class="progress-track" id="progressTrack" style="display:none;">
+                <div class="progress-fill" id="progressFill"></div>
+            </div>
+        </section>
+
+        <section class="panel">
+            <h2>一覧・絞り込み</h2>
+            <div class="filter-row">
+                <div class="field">
+                    <label for="prefFilter">都道府県で絞り込み</label>
+                    <select id="prefFilter">
+                        <option value="">すべて</option>
+                    </select>
+                </div>
+                <div class="field">
+                    <label for="areaFilter">エリアで絞り込み</label>
+                    <select id="areaFilter">
+                        <option value="">すべて</option>
+                    </select>
+                </div>
+                <div class="field">
+                    <label for="keywordFilter">施設名で検索</label>
+                    <input type="text" id="keywordFilter" placeholder="例) 箱根">
+                </div>
+            </div>
+
+            <table>
+                <thead>
+                    <tr>
+                        <th data-key="name">施設名<span class="arrow"></span></th>
+                        <th data-key="pref">都道府県<span class="arrow"></span></th>
+                        <th data-key="area">エリア<span class="arrow"></span></th>
+                        <th data-key="price">最安値(税込/総額)<span class="arrow"></span></th>
+                        <th data-key="status">空室状況<span class="arrow"></span></th>
+                        <th>楽天ページ</th>
+                    </tr>
+                </thead>
+                <tbody id="tableBody"></tbody>
+            </table>
+        </section>
+
+        <footer>
+            ※
+            料金は楽天トラベル空室検索APIが返す当該施設の最安プラン(指定人数・1室あたり)の参考値です。健保組合の会員価格・補助後の実質負担額とは異なります。実際の予約・正式な料金は健保組合の予約システムまたは各施設・楽天トラベルの予約ページでご確認ください。<br>
+            ※
+            施設名から楽天トラベル上の該当施設を自動検索しているため、まれに施設が見つからない・別施設と誤認識される場合があります。その場合は該当行の「施設番号を手動指定」欄に楽天トラベルの施設番号(hotelNo)を入力して再取得してください。
+        </footer>
+    </div>
+
+    <script>
+        /* ------------------------------------------------------------------
+           施設マスタ:健保保養所ページの一覧から作成
+           (rakutenNo が判明している施設は事前に指定、それ以外は名前で自動検索)
+        ------------------------------------------------------------------- */
+        const FACILITIES = [
+            { name: "トスラブ箱根ビオーレ", pref: "神奈川県", area: "箱根", keyword: "トスラブ箱根ビオーレ" },
+            { name: "トスラブ箱根和奏林", pref: "神奈川県", area: "箱根", keyword: "トスラブ箱根 和奏林" },
+            { name: "トスラブ館山ルアーナ", pref: "千葉県", area: "館山", keyword: "トスラブ館山ルアーナ" },
+            { name: "草津温泉 ホテルヴィレッジ", pref: "群馬県", area: "草津", keyword: "草津温泉ホテルヴィレッジ" },
+            { name: "ホテルハーヴェスト那須", pref: "栃木県", area: "那須", keyword: "ホテルハーヴェスト那須" },
+            { name: "ホテルハーヴェスト斑尾", pref: "長野県", area: "斑尾高原", keyword: "ホテルハーヴェスト斑尾" },
+            { name: "ブルーベリーヒル勝浦", pref: "千葉県", area: "勝浦", keyword: "ブルーベリーヒル勝浦" },
+            { name: "ホテルハーヴェスト伊東", pref: "静岡県", area: "伊東", keyword: "ホテルハーヴェスト伊東" },
+            { name: "ホテル琵琶レイクオーツカ", pref: "滋賀県", area: "近江八幡・琵琶湖", keyword: "ホテル琵琶レイクオーツカ" },
+            { name: "ホテル日航プリンセス京都", pref: "京都府", area: "京都市", keyword: "ホテル日航プリンセス京都" },
+            { name: "ホテルハーヴェスト南紀田辺", pref: "和歌山県", area: "田辺", keyword: "ホテルハーヴェスト南紀田辺" },
+            { name: "ホテルハーヴェスト旧軽井沢", pref: "長野県", area: "軽井沢", keyword: "ホテルハーヴェスト旧軽井沢" },
+            { name: "ホテルハーヴェスト京都鷹峯", pref: "京都府", area: "京都市", keyword: "ホテルハーヴェスト京都鷹峯" },
+            { name: "日光千姫物語", pref: "栃木県", area: "日光・鬼怒川", keyword: "日光千姫物語" },
+            { name: "ホテルハーヴェスト有馬六彩", pref: "兵庫県", area: "有馬温泉", keyword: "ホテルハーヴェスト有馬六彩" },
+            { name: "伊香保温泉 ホテル天坊", pref: "群馬県", area: "伊香保", keyword: "伊香保温泉ホテル天坊" },
+            { name: "和倉温泉 あえの風", pref: "石川県", area: "和倉温泉", keyword: "和倉温泉 あえの風" },
+            { name: "ラビスタ富士河口湖", pref: "山梨県", area: "富士河口湖", keyword: "ラビスタ富士河口湖" },
+            { name: "リソルの森", pref: "千葉県", area: "市原", keyword: "リソルの森" },
+            { name: "ホテルハーヴェスト浜名湖", pref: "静岡県", area: "浜名湖・舘山寺", keyword: "ホテルハーヴェスト浜名湖" },
+            { name: "鳴子温泉 湯元 吉祥", pref: "宮城県", area: "鳴子温泉", keyword: "鳴子温泉 湯元吉祥" },
+            { name: "ホテルオークラ東京ベイ", pref: "千葉県", area: "舞浜・浦安", keyword: "ホテルオークラ東京ベイ" },
+            { name: "熱海後楽園ホテル", pref: "静岡県", area: "熱海", keyword: "熱海後楽園ホテル" },
+            { name: "ラビスタ横須賀観音崎テラス", pref: "神奈川県", area: "横須賀・観音崎", keyword: "ラビスタ横須賀観音崎テラス" },
+            { name: "ゆふいん山水館", pref: "大分県", area: "湯布院", keyword: "ゆふいん山水館" },
+            { name: "ラビスタ熱海テラス", pref: "静岡県", area: "熱海", keyword: "ラビスタ熱海テラス" },
+            { name: "ホテルハーヴェスト鬼怒川", pref: "栃木県", area: "日光・鬼怒川", keyword: "ホテルハーヴェスト鬼怒川" },
+            { name: "鎌倉パークホテル", pref: "神奈川県", area: "鎌倉", keyword: "鎌倉パークホテル" },
+            { name: "蓼科東急ホテル", pref: "長野県", area: "蓼科", keyword: "蓼科東急ホテル" },
+            { name: "NASPAニューオータニ", pref: "新潟県", area: "苗場・湯沢", keyword: "NASPAニューオータニ" },
+            { name: "定山渓 ゆらく草庵", pref: "北海道", area: "定山渓", keyword: "定山渓 ゆらく草庵" },
+            { name: "NAGU 勝浦", pref: "千葉県", area: "勝浦", keyword: "NAGU勝浦" },
+            { name: "プレジャーリゾート伊豆赤沢温泉 赤沢温泉ホテル", pref: "静岡県", area: "伊豆・伊東", keyword: "赤沢温泉ホテル 伊豆" },
+            { name: "軽井沢マリオットホテル", pref: "長野県", area: "軽井沢", keyword: "軽井沢マリオットホテル" },
+            { name: "高山グリーンホテル", pref: "岐阜県", area: "高山", keyword: "高山グリーンホテル" },
+            { name: "アオアヲナルトリゾート", pref: "徳島県", area: "鳴門", keyword: "アオアヲナルトリゾート" },
+            { name: "ホテル日航アリビラ", pref: "沖縄県", area: "読谷", keyword: "ホテル日航アリビラ" },
+            { name: "グランドメルキュール伊勢志摩", pref: "三重県", area: "伊勢志摩", keyword: "グランドメルキュール伊勢志摩" },
+            { name: "スパリゾートハワイアンズ モノリスタワー", pref: "福島県", area: "いわき", keyword: "スパリゾートハワイアンズ モノリスタワー" },
+            { name: "フルーツパーク富士屋ホテル", pref: "山梨県", area: "甲府・石和", keyword: "フルーツパーク富士屋ホテル" },
+        ];
+
+        /* ランタイム状態 */
+        let appId = "";
+        let accessKey = "";
+        const hotelNoCache = {}; // facility index -> resolved hotelNo (or null)
+        const rowState = FACILITIES.map(f => ({
+            ...f,
+            hotelNo: null,
+            matchedName: null,
+            price: null,
+            available: null, // true/false/null(未検索)
+            rakutenUrl: null,
+            errorMsg: null,
+        }));
+
+        /* ------------------------------------------------------------------
+           楽天トラベルAPI呼び出し(JSONPでCORS回避)
+        ------------------------------------------------------------------- */
+        let jsonpCounter = 0;
+        function jsonpRequest(url) {
+            return new Promise((resolve, reject) => {
+                const cbName = "rakutenCb_" + (jsonpCounter++) + "_" + Date.now();
+                const script = document.createElement("script");
+                let settled = false;
+
+                window[cbName] = (data) => {
+                    settled = true;
+                    resolve(data);
+                    cleanup();
+                };
+
+                const timeout = setTimeout(() => {
+                    if (!settled) {
+                        reject(new Error("timeout"));
+                        cleanup();
+                    }
+                }, 12000);
+
+                function cleanup() {
+                    clearTimeout(timeout);
+                    delete window[cbName];
+                    if (script.parentNode) script.parentNode.removeChild(script);
+                }
+
+                script.onerror = () => {
+                    if (!settled) { reject(new Error("network")); cleanup(); }
+                };
+                script.src = url + "&callback=" + cbName;
+                document.body.appendChild(script);
+            });
+        }
+
+        async function resolveHotelNo(index) {
+            if (hotelNoCache[index] !== undefined) return hotelNoCache[index];
+            const f = FACILITIES[index];
+            const url = "https://openapi.rakuten.co.jp/engine/api/Travel/KeywordHotelSearch/20170426"
+                + "?applicationId=" + encodeURIComponent(appId)
+                + "&accessKey=" + encodeURIComponent(accessKey)
+                + "&format=json"
+                + "&keyword=" + encodeURIComponent(f.keyword)
+                + "&hits=1"
+                + "&responseType=small";
+            try {
+                const data = await jsonpRequest(url);
+                if (data && data.hotels && data.hotels.length > 0) {
+                    const basic = data.hotels[0].hotel[0].hotelBasicInfo;
+                    hotelNoCache[index] = { hotelNo: basic.hotelNo, matchedName: basic.hotelName };
+                } else {
+                    hotelNoCache[index] = null;
+                }
+            } catch (e) {
+                hotelNoCache[index] = { error: e.message };
+            }
+            return hotelNoCache[index];
+        }
+
+        async function fetchVacancy(hotelNo, checkin, checkout, adultNum) {
+            const url = "https://openapi.rakuten.co.jp/engine/api/Travel/VacantHotelSearch/20170426"
+                + "?applicationId=" + encodeURIComponent(appId)
+                + "&accessKey=" + encodeURIComponent(accessKey)
+                + "&format=json"
+                + "&hotelNo=" + encodeURIComponent(hotelNo)
+                + "&checkinDate=" + checkin
+                + "&checkoutDate=" + checkout
+                + "&adultNum=" + adultNum
+                + "&responseType=small";
+            const data = await jsonpRequest(url);
+            if (data && data.hotels && data.hotels.length > 0) {
+                const basic = data.hotels[0].hotel[0].hotelBasicInfo;
+                return {
+                    available: true,
+                    price: basic.hotelMinCharge || null,
+                    url: basic.hotelInformationUrl || basic.hotelInformationUrl,
+                };
+            }
+            return { available: false, price: null, url: null };
+        }
+
+        function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+        /* ------------------------------------------------------------------
+           検索実行フロー
+        ------------------------------------------------------------------- */
+        const statusBar = document.getElementById("statusBar");
+        const statusText = document.getElementById("statusText");
+        const statusCount = document.getElementById("statusCount");
+        const progressTrack = document.getElementById("progressTrack");
+        const progressFill = document.getElementById("progressFill");
+        const searchBtn = document.getElementById("searchBtn");
+
+        async function runSearch() {
+            appId = document.getElementById("appId").value.trim();
+            accessKey = document.getElementById("accessKey").value.trim();
+            const checkin = document.getElementById("checkin").value;
+            const checkout = document.getElementById("checkout").value;
+            const adultNum = document.getElementById("adultNum").value || "2";
+
+            if (!appId || !accessKey) {
+                alert("楽天ウェブサービスの「アプリID」と「アクセスキー」の両方を入力してください。");
+                return;
+            }
+            if (!checkin || !checkout) {
+                alert("チェックイン日・チェックアウト日を指定してください。");
+                return;
+            }
+            if (checkin >= checkout) {
+                alert("チェックアウト日はチェックイン日より後の日付にしてください。");
+                return;
+            }
+
+            searchBtn.disabled = true;
+            statusBar.style.display = "flex";
+            progressTrack.style.display = "block";
+
+            const total = rowState.length;
+            let done = 0;
+
+            for (let i = 0; i < rowState.length; i++) {
+                const row = rowState[i];
+                statusText.textContent = "検索中: " + row.name;
+                statusCount.textContent = done + " / " + total;
+
+                try {
+                    // 手動指定のhotelNoがあればそれを優先
+                    let hotelNo = row.manualHotelNo || null;
+                    let matchedName = row.matchedName;
+
+                    if (!hotelNo) {
+                        const resolved = await resolveHotelNo(i);
+                        await sleep(220);
+                        if (!resolved) {
+                            row.errorMsg = "楽天トラベルに該当施設が見つかりません(0件)";
+                            row.available = null;
+                            renderTable();
+                            done++; continue;
+                        }
+                        if (resolved.error) {
+                            const reason = resolved.error === "timeout"
+                                ? "応答なし(タイムアウト)。APIキーが正しいか、下の「APIキーをテスト」で確認してください"
+                                : resolved.error === "network"
+                                    ? "通信ブロック(広告ブロッカー等の可能性)。拡張機能を無効にして再試行してください"
+                                    : "検索エラー: " + resolved.error;
+                            row.errorMsg = reason;
+                            row.available = null;
+                            renderTable();
+                            done++; continue;
+                        }
+                        hotelNo = resolved.hotelNo;
+                        matchedName = resolved.matchedName;
+                    }
+
+                    row.hotelNo = hotelNo;
+                    row.matchedName = matchedName;
+
+                    const vac = await fetchVacancy(hotelNo, checkin, checkout, adultNum);
+                    row.available = vac.available;
+                    row.price = vac.price;
+                    row.rakutenUrl = vac.url;
+                    row.errorMsg = vac.available ? null : null;
+                    await sleep(220);
+                } catch (e) {
+                    row.errorMsg = "取得エラー: " + e.message;
+                    row.available = null;
+                }
+
+                done++;
+                progressFill.style.width = Math.round((done / total) * 100) + "%";
+                statusCount.textContent = done + " / " + total;
+                renderTable();
+            }
+
+            statusText.textContent = "検索完了";
+            searchBtn.disabled = false;
+        }
+
+        document.getElementById("testApiBtn").addEventListener("click", () => {
+            const id = document.getElementById("appId").value.trim();
+            const key = document.getElementById("accessKey").value.trim();
+            if (!id || !key) {
+                alert("先にアプリIDとアクセスキーの両方を入力してください。");
+                return;
+            }
+            // JSONPを使わず、生のURLを新しいタブで開く(callbackなし)。
+            // ここでJSONがそのまま表示されれば、アプリID・アクセスキーは有効。
+            // エラーJSON(wrong_parameter, invalid_parameterなど)が表示された場合は、
+            // 値の入力ミスを確認してください。
+            const testUrl = "https://openapi.rakuten.co.jp/engine/api/Travel/KeywordHotelSearch/20170426"
+                + "?applicationId=" + encodeURIComponent(id)
+                + "&accessKey=" + encodeURIComponent(key)
+                + "&format=json"
+                + "&keyword=" + encodeURIComponent("東京")
+                + "&hits=1";
+            window.open(testUrl, "_blank");
+            document.getElementById("testLinkResultHint").textContent =
+                "→ 新しいタブでJSON(hotelsを含む)が表示されればAPIキーは正常です。エラーメッセージが出る場合はその内容を確認してください。";
+        });
+
+        searchBtn.addEventListener("click", runSearch);
+        document.getElementById("saveAppId").addEventListener("click", () => {
+            appId = document.getElementById("appId").value.trim();
+            accessKey = document.getElementById("accessKey").value.trim();
+            alert((appId && accessKey) ? "このセッションでアプリID・アクセスキーを使用します。" : "アプリIDとアクセスキーの両方を入力してください。");
+        });
+
+        /* ------------------------------------------------------------------
+           フィルター・ソート・テーブル描画
+        ------------------------------------------------------------------- */
+        let sortKey = "name";
+        let sortDir = 1;
+
+        const prefFilterEl = document.getElementById("prefFilter");
+        const areaFilterEl = document.getElementById("areaFilter");
+        const keywordFilterEl = document.getElementById("keywordFilter");
+        const tableBody = document.getElementById("tableBody");
+
+        function initFilters() {
+            const prefs = [...new Set(FACILITIES.map(f => f.pref))];
+            prefs.forEach(p => {
+                const opt = document.createElement("option");
+                opt.value = p; opt.textContent = p;
+                prefFilterEl.appendChild(opt);
+            });
+            const areas = [...new Set(FACILITIES.map(f => f.area))];
+            areas.forEach(a => {
+                const opt = document.createElement("option");
+                opt.value = a; opt.textContent = a;
+                areaFilterEl.appendChild(opt);
+            });
+        }
+
+        document.querySelectorAll("thead th[data-key]").forEach(th => {
+            th.addEventListener("click", () => {
+                const key = th.dataset.key;
+                if (sortKey === key) { sortDir *= -1; } else { sortKey = key; sortDir = 1; }
+                document.querySelectorAll("thead th").forEach(x => x.classList.remove("active"));
+                th.classList.add("active");
+                th.querySelector(".arrow").textContent = sortDir === 1 ? "▲" : "▼";
+                renderTable();
+            });
+        });
+
+        [prefFilterEl, areaFilterEl, keywordFilterEl].forEach(el => {
+            el.addEventListener("input", renderTable);
+            el.addEventListener("change", renderTable);
+        });
+
+        function renderTable() {
+            const prefV = prefFilterEl.value;
+            const areaV = areaFilterEl.value;
+            const kw = keywordFilterEl.value.trim().toLowerCase();
+
+            let rows = rowState.filter(r => {
+                if (prefV && r.pref !== prefV) return false;
+                if (areaV && r.area !== areaV) return false;
+                if (kw && !r.name.toLowerCase().includes(kw)) return false;
+                return true;
+            });
+
+            rows.sort((a, b) => {
+                let av, bv;
+                switch (sortKey) {
+                    case "price":
+                        av = a.price === null || a.price === undefined ? Infinity : a.price;
+                        bv = b.price === null || b.price === undefined ? Infinity : b.price;
+                        break;
+                    case "status":
+                        av = a.available === true ? 0 : a.available === false ? 1 : 2;
+                        bv = b.available === true ? 0 : b.available === false ? 1 : 2;
+                        break;
+                    case "pref": av = a.pref; bv = b.pref; break;
+                    case "area": av = a.area; bv = b.area; break;
+                    default: av = a.name; bv = b.name;
+                }
+                if (av < bv) return -1 * sortDir;
+                if (av > bv) return 1 * sortDir;
+                return 0;
+            });
+
+            tableBody.innerHTML = "";
+            rows.forEach(r => {
+                const idx = rowState.indexOf(r);
+                const tr = document.createElement("tr");
+
+                const priceCell = r.price !== null && r.price !== undefined
+                    ? "¥" + Number(r.price).toLocaleString()
+                    : (r.available === null && !r.errorMsg ? "未検索" : "—");
+                const priceClass = (r.price !== null && r.price !== undefined) ? "price" : "price none";
+
+                let statusHtml;
+                if (r.errorMsg) {
+                    statusHtml = `<span class="tag ng">未対応</span><div class="note" style="color:var(--clay);margin-top:3px;">${r.errorMsg}</div>`;
+                } else if (r.available === true) {
+                    statusHtml = `<span class="tag ok">空室あり</span>`;
+                } else if (r.available === false) {
+                    statusHtml = `<span class="tag ng">満室/取扱なし</span>`;
+                } else {
+                    statusHtml = `<span class="tag wait">未検索</span>`;
+                }
+
+                const linkHtml = r.rakutenUrl
+                    ? `<a class="rakuten-link" href="${r.rakutenUrl}" target="_blank" rel="noopener">プランを見る</a>`
+                    : "—";
+
+                tr.innerHTML = `
+      <td class="name" data-label="施設名">
+        ${r.name}
+        ${r.matchedName ? `<div class="note" style="margin:2px 0 0;">楽天:${r.matchedName}</div>` : ""}
+        ${r.errorMsg ? `
+          <div class="fix-row">
+            <input type="text" class="fix-input" placeholder="施設番号を手動指定" id="fix-${idx}">
+            <button class="ghost tiny" data-fix="${idx}">再取得</button>
+          </div>` : ""}
+      </td>
+      <td class="pref" data-label="都道府県">${r.pref}</td>
+      <td data-label="エリア">${r.area}</td>
+      <td class="${priceClass}" data-label="最安値">${priceCell}</td>
+      <td class="status" data-label="空室状況">${statusHtml}</td>
+      <td data-label="楽天ページ">${linkHtml}</td>
+    `;
+                tableBody.appendChild(tr);
+            });
+
+            tableBody.querySelectorAll("[data-fix]").forEach(btn => {
+                btn.addEventListener("click", async () => {
+                    const idx = Number(btn.dataset.fix);
+                    const val = document.getElementById("fix-" + idx).value.trim();
+                    if (!val) return;
+                    rowState[idx].manualHotelNo = val;
+                    rowState[idx].errorMsg = null;
+                    const checkin = document.getElementById("checkin").value;
+                    const checkout = document.getElementById("checkout").value;
+                    const adultNum = document.getElementById("adultNum").value || "2";
+                    appId = document.getElementById("appId").value.trim();
+                    accessKey = document.getElementById("accessKey").value.trim();
+                    try {
+                        const vac = await fetchVacancy(val, checkin, checkout, adultNum);
+                        rowState[idx].hotelNo = val;
+                        rowState[idx].available = vac.available;
+                        rowState[idx].price = vac.price;
+                        rowState[idx].rakutenUrl = vac.url;
+                    } catch (e) {
+                        rowState[idx].errorMsg = "取得エラー: " + e.message;
+                    }
+                    renderTable();
+                });
+            });
+        }
+
+        /* 初期化 */
+        initFilters();
+        renderTable();
+
+        /* デフォルト日付(明日〜明後日)をセット */
+        (function setDefaultDates() {
+            const d1 = new Date(); d1.setDate(d1.getDate() + 1);
+            const d2 = new Date(); d2.setDate(d2.getDate() + 2);
+            const fmt = d => d.toISOString().slice(0, 10);
+            document.getElementById("checkin").value = fmt(d1);
+            document.getElementById("checkout").value = fmt(d2);
+        })();
+    </script>
+</body>
+
+</html>
