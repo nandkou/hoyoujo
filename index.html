@@ -845,8 +845,8 @@
         /* ------------------------------------------------------------------
            フィルター・ソート・テーブル描画
         ------------------------------------------------------------------- */
-        let sortKey = "name";
-        let sortDir = 1;
+        let sortKey = "price";
+        let sortDir = -1;
 
         const prefFilterEl = document.getElementById("prefFilter");
         const areaFilterEl = document.getElementById("areaFilter");
@@ -900,8 +900,15 @@
                 let av, bv;
                 switch (sortKey) {
                     case "price":
-                        av = a.price === null || a.price === undefined ? Infinity : a.price;
-                        bv = b.price === null || b.price === undefined ? Infinity : b.price;
+                        // 価格未取得の施設は、昇順・降順にかかわらず末尾に置く
+                        const aNoPrice = a.price === null || a.price === undefined;
+                        const bNoPrice = b.price === null || b.price === undefined;
+                        if (aNoPrice || bNoPrice) {
+                            if (aNoPrice && bNoPrice) return 0;
+                            return aNoPrice ? 1 : -1;
+                        }
+                        av = a.price;
+                        bv = b.price;
                         break;
                     case "status":
                         av = a.available === true ? 0 : a.available === false ? 1 : 2;
