@@ -517,9 +517,9 @@
            (rakutenNo が判明している施設は事前に指定、それ以外は名前で自動検索)
         ------------------------------------------------------------------- */
         const FACILITIES = [
-            { name: "トスラブ箱根ビオーレ", pref: "神奈川県", area: "箱根", keyword: "トスラブ箱根ビオーレ" },
-            { name: "トスラブ箱根和奏林", pref: "神奈川県", area: "箱根", keyword: "トスラブ箱根 和奏林" },
-            { name: "トスラブ館山ルアーナ", pref: "千葉県", area: "館山", keyword: "トスラブ館山ルアーナ" },
+            { name: "トスラブ箱根ビオーレ", pref: "神奈川県", area: "箱根", keyword: "トスラブ箱根ビオーレ", skipRakuten: true },
+            { name: "トスラブ箱根和奏林", pref: "神奈川県", area: "箱根", keyword: "トスラブ箱根 和奏林", skipRakuten: true },
+            { name: "トスラブ館山ルアーナ", pref: "千葉県", area: "館山", keyword: "トスラブ館山ルアーナ", skipRakuten: true },
             { name: "草津温泉 ホテルヴィレッジ", pref: "群馬県", area: "草津", keyword: "草津温泉ホテルヴィレッジ" },
             { name: "ホテルハーヴェスト那須", pref: "栃木県", area: "那須", keyword: "ホテルハーヴェスト那須" },
             { name: "ホテルハーヴェスト斑尾", pref: "長野県", area: "斑尾高原", keyword: "ホテルハーヴェスト斑尾" },
@@ -531,9 +531,9 @@
             { name: "ホテルハーヴェスト旧軽井沢", pref: "長野県", area: "軽井沢", keyword: "ホテルハーヴェスト旧軽井沢" },
             { name: "ホテルハーヴェスト京都鷹峯", pref: "京都府", area: "京都市", keyword: "ホテルハーヴェスト京都鷹峯" },
             { name: "日光千姫物語", pref: "栃木県", area: "日光・鬼怒川", keyword: "日光千姫物語" },
-            { name: "ホテルハーヴェスト有馬六彩", pref: "兵庫県", area: "有馬温泉", keyword: "ホテルハーヴェスト有馬六彩" },
+            { name: "ホテルハーヴェスト有馬六彩", pref: "兵庫県", area: "有馬温泉", keyword: "ホテルハーヴェスト有馬六彩", skipRakuten: true },
             { name: "伊香保温泉 ホテル天坊", pref: "群馬県", area: "伊香保", keyword: "伊香保温泉ホテル天坊" },
-            { name: "和倉温泉 あえの風", pref: "石川県", area: "和倉温泉", keyword: "和倉温泉 あえの風" },
+            { name: "和倉温泉 あえの風", pref: "石川県", area: "和倉温泉", keyword: "和倉温泉 あえの風", skipRakuten: true },
             { name: "ラビスタ富士河口湖", pref: "山梨県", area: "富士河口湖", keyword: "ラビスタ富士河口湖" },
             { name: "リソルの森", pref: "千葉県", area: "市原", keyword: "リソルの森" },
             { name: "ホテルハーヴェスト浜名湖", pref: "静岡県", area: "浜名湖・舘山寺", keyword: "ホテルハーヴェスト浜名湖" },
@@ -548,7 +548,7 @@
             { name: "蓼科東急ホテル", pref: "長野県", area: "蓼科", keyword: "蓼科東急ホテル" },
             { name: "NASPAニューオータニ", pref: "新潟県", area: "苗場・湯沢", keyword: "NASPAニューオータニ" },
             { name: "定山渓 ゆらく草庵", pref: "北海道", area: "定山渓", keyword: "定山渓 ゆらく草庵" },
-            { name: "NAGU 勝浦", pref: "千葉県", area: "勝浦", keyword: "NAGU勝浦" },
+            { name: "NAGU 勝浦", pref: "千葉県", area: "勝浦", keyword: "NAGU勝浦", skipRakuten: true },
             { name: "プレジャーリゾート伊豆赤沢温泉 赤沢温泉ホテル", pref: "静岡県", area: "伊豆・伊東", keyword: "赤沢温泉ホテル 伊豆" },
             { name: "軽井沢マリオットホテル", pref: "長野県", area: "軽井沢", keyword: "軽井沢マリオットホテル" },
             { name: "高山グリーンホテル", pref: "岐阜県", area: "高山", keyword: "高山グリーンホテル" },
@@ -740,6 +740,18 @@
                 statusText.textContent = "検索中: " + row.name;
                 statusCount.textContent = done + " / " + total;
 
+                if (row.skipRakuten) {
+                    row.available = false;
+                    row.price = null;
+                    row.rakutenUrl = null;
+                    row.errorMsg = "楽天トラベル取扱なし（API検索対象外）";
+                    done++;
+                    progressFill.style.width = Math.round((done / total) * 100) + "%";
+                    statusCount.textContent = done + " / " + total;
+                    renderTable();
+                    continue;
+                }
+
                 try {
                     // 手動指定のhotelNoがあればそれを優先
                     let hotelNo = row.manualHotelNo || null;
@@ -915,7 +927,9 @@
                 const priceClass = (r.price !== null && r.price !== undefined) ? "price" : "price none";
 
                 let statusHtml;
-                if (r.errorMsg) {
+                if (r.skipRakuten) {
+                    statusHtml = `<span class="tag ng">楽天取扱なし</span>`;
+                } else if (r.errorMsg) {
                     statusHtml = `<span class="tag ng">未対応</span><div class="note" style="color:var(--clay);margin-top:3px;">${r.errorMsg}</div>`;
                 } else if (r.available === true) {
                     statusHtml = `<span class="tag ok">空室あり</span>`;
@@ -933,7 +947,7 @@
       <td class="name" data-label="施設名">
         ${r.name}
         ${r.matchedName ? `<div class="note" style="margin:2px 0 0;">楽天:${r.matchedName}</div>` : ""}
-        ${r.errorMsg ? `
+        ${r.errorMsg && !r.skipRakuten ? `
           <div class="fix-row">
             <input type="text" class="fix-input" placeholder="施設番号を手動指定" id="fix-${idx}">
             <button class="ghost tiny" data-fix="${idx}">再取得</button>
