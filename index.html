@@ -403,7 +403,7 @@
         <header class="top">
             <div>
                 <h1>保養所プライスボード</h1>
-                <div class="sub">健保保養所・提携ホテルの料金を、日付を指定して横並びで見比べるための一覧です。料金は楽天トラベルの空室検索結果を参照します。</div>
+                <div class="sub">健保保養所・提携ホテルの1泊2食付料金を、日付を指定して横並びで見比べるための一覧です。料金は楽天トラベルの空室検索結果を参照します。</div>
             </div>
         </header>
 
@@ -439,12 +439,18 @@
                     <input type="date" id="checkin">
                 </div>
                 <div class="field">
-                    <label for="checkout">チェックアウト</label>
-                    <input type="date" id="checkout">
+                    <label for="checkout">チェックアウト <span id="nightsLabel" style="color:var(--moss);font-weight:600;">(1泊)</span></label>
+                    <input type="date" id="checkout" disabled>
                 </div>
                 <div class="field">
                     <label for="adultNum">大人人数</label>
                     <input type="number" id="adultNum" min="1" max="8" value="2">
+                </div>
+                <div class="field">
+                    <label for="mealCondition">食事条件</label>
+                    <select id="mealCondition" disabled>
+                        <option value="breakfast,dinner" selected>1泊2食付 (朝・夕食)</option>
+                    </select>
                 </div>
                 <div class="field" style="justify-content:flex-end;">
                     <button class="primary" id="searchBtn" type="button">この条件で料金を検索</button>
@@ -562,6 +568,7 @@
             hotelNo: null,
             matchedName: null,
             price: null,
+            planName: null,
             available: null, // true/false/null(未検索)
             rakutenUrl: null,
             errorMsg: null,
@@ -605,8 +612,8 @@
             return hotelNoCache[index];
         }
 
-        async function fetchVacancy(hotelNo, checkin, checkout, adultNum) {
-            const url = "https://openapi.rakuten.co.jp/engine/api/Travel/VacantHotelSearch/20170426"
+        async function fetchVacancy(hotelNo, checkin, checkout, adultNum, mealCondition = "breakfast,dinner") {
+            let url = "https://openapi.rakuten.co.jp/engine/api/Travel/VacantHotelSearch/20170426"
                 + "?applicationId=" + encodeURIComponent(appId)
                 + "&accessKey=" + encodeURIComponent(accessKey)
                 + "&format=json"
@@ -615,10 +622,13 @@
                 + "&checkoutDate=" + checkout
                 + "&adultNum=" + adultNum
                 + "&responseType=small";
+            if (mealCondition && mealCondition !== "all") {
+                url += "&squeezeCondition=" + encodeURIComponent(mealCondition);
+            }
             const res = await fetch(url);
             if (!res.ok) {
                 if (res.status === 404) {
-                    return { available: false, price: null, url: null };
+                    return { available: false, price: null, url: null, planName: null };
                 }
                 const errData = await res.json().catch(() => ({}));
                 const msg = errData?.errors?.errorMessage || errData?.error_description || `HTTP ${res.status}`;
@@ -626,14 +636,47 @@
             }
             const data = await res.json();
             if (data && data.hotels && data.hotels.length > 0) {
-                const basic = data.hotels[0].hotel[0].hotelBasicInfo;
+                const hotelItems = data.hotels[0].hotel;
+                const basic = hotelItems[0]?.hotelBasicInfo || {};
+
+                // 宿泊プラン情報から該当条件の最安プランの合計料金、予約URL、プラン名を抽出
+                let bestPrice = null;
+                let bestUrl = null;
+                let bestPlanName = null;
+
+                for (let i = 1; i < hotelItems.length; i++) {
+                    const item = hotelItems[i];
+                    if (item.roomInfo) {
+                        let roomBasic = null;
+                        let roomTotal = 0;
+                        let hasDaily = false;
+                        for (const r of item.roomInfo) {
+                            if (r.roomBasicInfo) {
+                                roomBasic = r.roomBasicInfo;
+                            }
+                            if (r.dailyCharge && typeof r.dailyCharge.total === "number") {
+                                roomTotal += r.dailyCharge.total;
+                                hasDaily = true;
+                            }
+                        }
+                        if (hasDaily && (bestPrice === null || roomTotal < bestPrice)) {
+                            bestPrice = roomTotal;
+                            if (roomBasic) {
+                                bestUrl = roomBasic.reserveUrl || null;
+                                bestPlanName = roomBasic.planName || null;
+                            }
+                        }
+                    }
+                }
+
                 return {
                     available: true,
-                    price: basic.hotelMinCharge || null,
-                    url: basic.hotelInformationUrl || null,
+                    price: bestPrice !== null ? bestPrice : (basic.hotelMinCharge || null),
+                    url: bestUrl || basic.hotelInformationUrl || null,
+                    planName: bestPlanName || null,
                 };
             }
-            return { available: false, price: null, url: null };
+            return { available: false, price: null, url: null, planName: null };
         }
 
         function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
@@ -654,6 +697,8 @@
             const checkin = document.getElementById("checkin").value;
             const checkout = document.getElementById("checkout").value;
             const adultNum = document.getElementById("adultNum").value || "2";
+            // 表示・検索対象は常に1泊2食付に固定
+            const mealCondition = "breakfast,dinner";
 
             if (!appId || !accessKey) {
                 alert("楽天ウェブサービスの「アプリID」と「アクセスキー」の両方を入力してください。");
@@ -712,11 +757,12 @@
                     row.hotelNo = hotelNo;
                     row.matchedName = matchedName;
 
-                    const vac = await fetchVacancy(hotelNo, checkin, checkout, adultNum);
+                    const vac = await fetchVacancy(hotelNo, checkin, checkout, adultNum, mealCondition);
                     row.available = vac.available;
                     row.price = vac.price;
+                    row.planName = vac.planName;
                     row.rakutenUrl = vac.url;
-                    row.errorMsg = vac.available ? null : null;
+                    row.errorMsg = null;
                     await sleep(220);
                 } catch (e) {
                     row.errorMsg = "取得エラー: " + e.message;
@@ -900,7 +946,7 @@
                     appId = document.getElementById("appId").value.trim();
                     accessKey = document.getElementById("accessKey").value.trim();
                     try {
-                        const vac = await fetchVacancy(val, checkin, checkout, adultNum);
+                        const vac = await fetchVacancy(val, checkin, checkout, adultNum, "breakfast,dinner");
                         rowState[idx].hotelNo = val;
                         rowState[idx].available = vac.available;
                         rowState[idx].price = vac.price;
@@ -977,13 +1023,33 @@
         loadLocalEnv();
 
         /* デフォルト日付(明日〜明後日)をセット */
+        const checkinEl = document.getElementById("checkin");
+        const checkoutEl = document.getElementById("checkout");
+        const dateToMs = value => {
+            const [year, month, day] = value.split("-").map(Number);
+            return new Date(year, month - 1, day).getTime();
+        };
+        const msPerDay = 24 * 60 * 60 * 1000;
+        const fixedNights = 1;
+
         (function setDefaultDates() {
             const d1 = new Date(); d1.setDate(d1.getDate() + 1);
             const d2 = new Date(); d2.setDate(d2.getDate() + 2);
             const fmt = d => d.toISOString().slice(0, 10);
-            document.getElementById("checkin").value = fmt(d1);
-            document.getElementById("checkout").value = fmt(d2);
+            checkinEl.value = fmt(d1);
+            checkoutEl.value = fmt(d2);
         })();
+
+        // チェックイン変更時は、現在の泊数(一泊)を保ったままチェックアウトも移動
+        checkinEl.addEventListener("change", () => {
+            if (!checkinEl.value) return;
+            const checkoutDate = new Date(dateToMs(checkinEl.value) + fixedNights * msPerDay);
+            const year = checkoutDate.getFullYear();
+            const month = String(checkoutDate.getMonth() + 1).padStart(2, "0");
+            const day = String(checkoutDate.getDate()).padStart(2, "0");
+            checkoutEl.value = `${year}-${month}-${day}`;
+        });
+
     </script>
 </body>
 
