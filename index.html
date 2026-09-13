@@ -426,9 +426,9 @@
             </div>
             <div class="note" id="testLinkWrap"
                 style="margin-bottom:16px;padding-bottom:16px;border-bottom:1px dashed var(--line);">
-                うまく取得できない場合は、まずこのリンクをクリックして、別タブでアプリID・アクセスキーの動作を確認してください:<br>
+                接続テスト:<br>
                 <button class="ghost tiny" id="testApiBtn" type="button"
-                    style="margin-top:6px;">APIキーをテスト(別タブで開く)</button>
+                    style="margin-top:6px;">APIキーをテスト</button>
                 <span id="testLinkResultHint" style="margin-left:8px;"></span>
             </div>
 
@@ -503,6 +503,8 @@
         </footer>
     </div>
 
+    <!-- ローカル環境設定 (env.js が存在すれば自動読み込み) -->
+    <script src="./env.js"></script>
     <script>
         /* ------------------------------------------------------------------
            施設マスタ:健保保養所ページの一覧から作成
@@ -566,42 +568,8 @@
         }));
 
         /* ------------------------------------------------------------------
-           楽天トラベルAPI呼び出し(JSONPでCORS回避)
+           楽天トラベルAPI呼び出し (fetch / CORS対応)
         ------------------------------------------------------------------- */
-        let jsonpCounter = 0;
-        function jsonpRequest(url) {
-            return new Promise((resolve, reject) => {
-                const cbName = "rakutenCb_" + (jsonpCounter++) + "_" + Date.now();
-                const script = document.createElement("script");
-                let settled = false;
-
-                window[cbName] = (data) => {
-                    settled = true;
-                    resolve(data);
-                    cleanup();
-                };
-
-                const timeout = setTimeout(() => {
-                    if (!settled) {
-                        reject(new Error("timeout"));
-                        cleanup();
-                    }
-                }, 12000);
-
-                function cleanup() {
-                    clearTimeout(timeout);
-                    delete window[cbName];
-                    if (script.parentNode) script.parentNode.removeChild(script);
-                }
-
-                script.onerror = () => {
-                    if (!settled) { reject(new Error("network")); cleanup(); }
-                };
-                script.src = url + "&callback=" + cbName;
-                document.body.appendChild(script);
-            });
-        }
-
         async function resolveHotelNo(index) {
             if (hotelNoCache[index] !== undefined) return hotelNoCache[index];
             const f = FACILITIES[index];
@@ -613,7 +581,18 @@
                 + "&hits=1"
                 + "&responseType=small";
             try {
-                const data = await jsonpRequest(url);
+                const res = await fetch(url);
+                if (!res.ok) {
+                    if (res.status === 404) {
+                        hotelNoCache[index] = null;
+                        return null;
+                    }
+                    const errData = await res.json().catch(() => ({}));
+                    const msg = errData?.errors?.errorMessage || errData?.error_description || `HTTP ${res.status}`;
+                    hotelNoCache[index] = { error: msg };
+                    return hotelNoCache[index];
+                }
+                const data = await res.json();
                 if (data && data.hotels && data.hotels.length > 0) {
                     const basic = data.hotels[0].hotel[0].hotelBasicInfo;
                     hotelNoCache[index] = { hotelNo: basic.hotelNo, matchedName: basic.hotelName };
@@ -636,13 +615,22 @@
                 + "&checkoutDate=" + checkout
                 + "&adultNum=" + adultNum
                 + "&responseType=small";
-            const data = await jsonpRequest(url);
+            const res = await fetch(url);
+            if (!res.ok) {
+                if (res.status === 404) {
+                    return { available: false, price: null, url: null };
+                }
+                const errData = await res.json().catch(() => ({}));
+                const msg = errData?.errors?.errorMessage || errData?.error_description || `HTTP ${res.status}`;
+                throw new Error(msg);
+            }
+            const data = await res.json();
             if (data && data.hotels && data.hotels.length > 0) {
                 const basic = data.hotels[0].hotel[0].hotelBasicInfo;
                 return {
                     available: true,
                     price: basic.hotelMinCharge || null,
-                    url: basic.hotelInformationUrl || basic.hotelInformationUrl,
+                    url: basic.hotelInformationUrl || null,
                 };
             }
             return { available: false, price: null, url: null };
@@ -745,26 +733,33 @@
             searchBtn.disabled = false;
         }
 
-        document.getElementById("testApiBtn").addEventListener("click", () => {
+        document.getElementById("testApiBtn").addEventListener("click", async () => {
             const id = document.getElementById("appId").value.trim();
             const key = document.getElementById("accessKey").value.trim();
+            const hintEl = document.getElementById("testLinkResultHint");
             if (!id || !key) {
                 alert("先にアプリIDとアクセスキーの両方を入力してください。");
                 return;
             }
-            // JSONPを使わず、生のURLを新しいタブで開く(callbackなし)。
-            // ここでJSONがそのまま表示されれば、アプリID・アクセスキーは有効。
-            // エラーJSON(wrong_parameter, invalid_parameterなど)が表示された場合は、
-            // 値の入力ミスを確認してください。
+            hintEl.innerHTML = `<span style="color:var(--muted);">通信テスト中...</span>`;
             const testUrl = "https://openapi.rakuten.co.jp/engine/api/Travel/KeywordHotelSearch/20170426"
                 + "?applicationId=" + encodeURIComponent(id)
                 + "&accessKey=" + encodeURIComponent(key)
                 + "&format=json"
                 + "&keyword=" + encodeURIComponent("東京")
                 + "&hits=1";
-            window.open(testUrl, "_blank");
-            document.getElementById("testLinkResultHint").textContent =
-                "→ 新しいタブでJSON(hotelsを含む)が表示されればAPIキーは正常です。エラーメッセージが出る場合はその内容を確認してください。";
+            try {
+                const res = await fetch(testUrl);
+                const data = await res.json();
+                if (res.ok && data && (data.hotels || data.pagingInfo)) {
+                    hintEl.innerHTML = `<span style="color:#059669;font-weight:600;">✓ API疎通テスト成功！正常に応答を受信しました。(検索結果: ${data.pagingInfo?.recordCount || 0}件)</span>`;
+                } else {
+                    const errDetail = data?.errors?.errorMessage || data?.error_description || data?.error || JSON.stringify(data);
+                    hintEl.innerHTML = `<span style="color:#dc2626;font-weight:600;">✗ APIエラー (HTTP ${res.status}): ${errDetail}</span>`;
+                }
+            } catch (err) {
+                hintEl.innerHTML = `<span style="color:#dc2626;font-weight:600;">✗ 通信エラー: ${err.message}</span>`;
+            }
         });
 
         searchBtn.addEventListener("click", runSearch);
@@ -918,9 +913,68 @@
             });
         }
 
+        /* ------------------------------------------------------------------
+           ローカル環境での .env / env.js 自動読み込み
+        ------------------------------------------------------------------- */
+        async function loadLocalEnv() {
+            let loadedAppId = "";
+            let loadedAccessKey = "";
+            let source = "";
+
+            // 1. env.js (window.__ENV__) からの読み込み (file:// またはローカル環境)
+            if (window.__ENV__) {
+                if (window.__ENV__.APPLICATION_ID) loadedAppId = String(window.__ENV__.APPLICATION_ID).trim();
+                if (window.__ENV__.ACCESS_KEY) loadedAccessKey = String(window.__ENV__.ACCESS_KEY).trim();
+                if (loadedAppId || loadedAccessKey) source = "env.js";
+            }
+
+            // 2. ローカルサーバー(http://)経由の場合は fetch('.env') で最新の .env を直接読み込み
+            try {
+                const res = await fetch("./.env", { cache: "no-store" });
+                if (res.ok) {
+                    const text = await res.text();
+                    const lines = text.split(/\r?\n/);
+                    for (const line of lines) {
+                        const trimmed = line.trim();
+                        if (!trimmed || trimmed.startsWith("#")) continue;
+                        const match = trimmed.match(/^([^=]+)=(.*)$/);
+                        if (match) {
+                            const key = match[1].trim();
+                            const val = match[2].trim().replace(/^["']|["']$/g, "");
+                            if (key === "APPLICATION_ID") loadedAppId = val;
+                            if (key === "ACCESS_KEY") loadedAccessKey = val;
+                        }
+                    }
+                    if (loadedAppId || loadedAccessKey) source = ".env";
+                }
+            } catch (_) {
+                // file:// や CORS 制限時は無視
+            }
+
+            // 3. 値を入力フィールドおよびスクリプト変数に反映
+            if (loadedAppId) {
+                const appIdEl = document.getElementById("appId");
+                if (appIdEl) appIdEl.value = loadedAppId;
+                appId = loadedAppId;
+            }
+            if (loadedAccessKey) {
+                const accessKeyEl = document.getElementById("accessKey");
+                if (accessKeyEl) accessKeyEl.value = loadedAccessKey;
+                accessKey = loadedAccessKey;
+            }
+
+            if (loadedAppId && loadedAccessKey) {
+                const hint = document.getElementById("testLinkResultHint");
+                if (hint) {
+                    hint.innerHTML = `<span style="color:#059669;font-weight:600;">✓ ローカル設定 (${source}) からアプリID・アクセスキーを自動読み込みしました</span>`;
+                }
+            }
+        }
+
         /* 初期化 */
         initFilters();
         renderTable();
+        loadLocalEnv();
 
         /* デフォルト日付(明日〜明後日)をセット */
         (function setDefaultDates() {
