@@ -588,7 +588,7 @@
                 + "&hits=1"
                 + "&responseType=small";
             try {
-                const res = await fetch(url);
+                const res = await fetchRakutenApi(url);
                 if (!res.ok) {
                     if (res.status === 404) {
                         hotelNoCache[index] = null;
@@ -625,7 +625,7 @@
             if (mealCondition && mealCondition !== "all") {
                 url += "&squeezeCondition=" + encodeURIComponent(mealCondition);
             }
-            const res = await fetch(url);
+            const res = await fetchRakutenApi(url);
             if (!res.ok) {
                 if (res.status === 404) {
                     return { available: false, price: null, url: null, planName: null };
@@ -680,6 +680,21 @@
         }
 
         function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+        // 楽天APIは全経路を直列化し、リクエスト開始間隔を最低1秒に保つ
+        let lastApiRequestAt = 0;
+        let apiRequestQueue = Promise.resolve();
+        function fetchRakutenApi(url) {
+            const request = apiRequestQueue.then(async () => {
+                const waitMs = Math.max(0, 1000 - (Date.now() - lastApiRequestAt));
+                if (waitMs > 0) await sleep(waitMs);
+                lastApiRequestAt = Date.now();
+                return fetch(url);
+            });
+            // 失敗してもキュー自体は次のリクエストへ進める
+            apiRequestQueue = request.catch(() => undefined);
+            return request;
+        }
 
         /* ------------------------------------------------------------------
            検索実行フロー
@@ -795,7 +810,7 @@
                 + "&keyword=" + encodeURIComponent("東京")
                 + "&hits=1";
             try {
-                const res = await fetch(testUrl);
+                const res = await fetchRakutenApi(testUrl);
                 const data = await res.json();
                 if (res.ok && data && (data.hotels || data.pagingInfo)) {
                     hintEl.innerHTML = `<span style="color:#059669;font-weight:600;">✓ API疎通テスト成功！正常に応答を受信しました。(検索結果: ${data.pagingInfo?.recordCount || 0}件)</span>`;
