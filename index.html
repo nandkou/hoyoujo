@@ -5,6 +5,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>保養所プライスボード</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
         :root {
             --ink: #1c2b28;
@@ -26,7 +29,7 @@
             margin: 0;
             background: var(--paper);
             color: var(--ink);
-            font-family: "Hiragino Mincho ProN", "Yu Mincho", serif;
+            font-family: "Noto Sans JP", sans-serif;
             line-height: 1.6;
         }
 
@@ -56,7 +59,7 @@
         }
 
         header.top .sub {
-            font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", sans-serif;
+            font-family: "Noto Sans JP", sans-serif;
             color: var(--muted);
             font-size: .85rem;
             max-width: 420px;
@@ -71,7 +74,7 @@
         }
 
         section.panel h2 {
-            font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", sans-serif;
+            font-family: "Noto Sans JP", sans-serif;
             font-size: .95rem;
             font-weight: 600;
             margin: 0 0 16px;
@@ -93,7 +96,7 @@
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
             gap: 14px 18px;
-            font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", sans-serif;
+            font-family: "Noto Sans JP", sans-serif;
         }
 
         .field {
@@ -109,7 +112,7 @@
 
         .field input,
         .field select {
-            font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", sans-serif;
+            font-family: "Noto Sans JP", sans-serif;
             padding: 8px 10px;
             border: 1px solid var(--line);
             border-radius: 2px;
@@ -136,7 +139,7 @@
             margin-bottom: 16px;
             padding-bottom: 16px;
             border-bottom: 1px dashed var(--line);
-            font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", sans-serif;
+            font-family: "Noto Sans JP", sans-serif;
         }
 
         .appid-row .field {
@@ -149,14 +152,14 @@
         }
 
         .note {
-            font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", sans-serif;
+            font-family: "Noto Sans JP", sans-serif;
             font-size: .78rem;
             color: var(--muted);
             margin-top: 4px;
         }
 
         button {
-            font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", sans-serif;
+            font-family: "Noto Sans JP", sans-serif;
             cursor: pointer;
             border: none;
             border-radius: 2px;
@@ -201,7 +204,7 @@
             display: flex;
             justify-content: space-between;
             align-items: center;
-            font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", sans-serif;
+            font-family: "Noto Sans JP", sans-serif;
             font-size: .82rem;
             color: var(--muted);
             margin: 16px 0 10px;
@@ -231,13 +234,13 @@
             flex-wrap: wrap;
             align-items: flex-end;
             margin-bottom: 14px;
-            font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", sans-serif;
+            font-family: "Noto Sans JP", sans-serif;
         }
 
         table {
             width: 100%;
             border-collapse: collapse;
-            font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", sans-serif;
+            font-family: "Noto Sans JP", sans-serif;
             font-size: .88rem;
         }
 
@@ -349,7 +352,7 @@
 
         footer {
             margin-top: 40px;
-            font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", sans-serif;
+            font-family: "Noto Sans JP", sans-serif;
             font-size: .75rem;
             color: var(--muted);
             border-top: 1px solid var(--line);
@@ -563,6 +566,120 @@
         let appId = "";
         let accessKey = "";
         const hotelNoCache = {}; // facility index -> resolved hotelNo (or null)
+        const PRICE_DB_STORAGE_KEY = "hoyoujo-price-db-v1";
+
+        // 検索条件ごとの料金結果をブラウザのlocalStorageに保存する簡易DB
+        let priceDatabase = loadPriceDatabase();
+
+        function loadPriceDatabase() {
+            try {
+                const saved = localStorage.getItem(PRICE_DB_STORAGE_KEY);
+                const parsed = saved ? JSON.parse(saved) : {};
+                return parsed && typeof parsed === "object" ? parsed : {};
+            } catch (_) {
+                return {};
+            }
+        }
+
+        function savePriceDatabase() {
+            try {
+                localStorage.setItem(PRICE_DB_STORAGE_KEY, JSON.stringify(priceDatabase));
+            } catch (_) {
+                // localStorageが使用できない環境でも、API検索自体は継続する
+            }
+        }
+
+        function makePriceConditionKey(checkin, checkout, adultNum, mealCondition) {
+            return JSON.stringify({
+                checkin,
+                checkout,
+                adultNum: String(adultNum),
+                mealCondition,
+            });
+        }
+
+        function getCurrentPriceCondition() {
+            const checkin = document.getElementById("checkin").value;
+            const checkout = document.getElementById("checkout").value;
+            const adultNum = document.getElementById("adultNum").value || "2";
+            const mealCondition = "breakfast,dinner";
+            return {
+                checkin,
+                checkout,
+                adultNum,
+                mealCondition,
+                key: makePriceConditionKey(checkin, checkout, adultNum, mealCondition),
+            };
+        }
+
+        function resetDisplayedResults() {
+            rowState.forEach(row => {
+                row.price = null;
+                row.planName = null;
+                row.available = null;
+                row.rakutenUrl = null;
+                row.errorMsg = null;
+                row.fromCache = false;
+            });
+        }
+
+        function cacheRowResult(conditionKey, row) {
+            if (!conditionKey || row.errorMsg || row.skipRakuten) return;
+            if (!priceDatabase[conditionKey]) {
+                priceDatabase[conditionKey] = { savedAt: null, rows: {} };
+            }
+            priceDatabase[conditionKey].rows[row.name] = {
+                hotelNo: row.hotelNo || null,
+                matchedName: row.matchedName || null,
+                price: row.price ?? null,
+                planName: row.planName || null,
+                available: row.available,
+                rakutenUrl: row.rakutenUrl || null,
+            };
+            priceDatabase[conditionKey].savedAt = new Date().toISOString();
+            savePriceDatabase();
+        }
+
+        function beginPriceCacheRefresh(conditionKey) {
+            // 検索ボタンを押した場合は、その条件の過去結果を新しい検索結果で置き換える
+            priceDatabase[conditionKey] = { savedAt: null, rows: {} };
+            savePriceDatabase();
+        }
+
+        function applyCachedResults() {
+            const condition = getCurrentPriceCondition();
+            resetDisplayedResults();
+            const entry = priceDatabase[condition.key];
+            const cachedRows = entry?.rows || {};
+            let cachedCount = 0;
+
+            rowState.forEach(row => {
+                const cached = cachedRows[row.name];
+                if (!cached) return;
+                row.hotelNo = cached.hotelNo || row.hotelNo;
+                row.matchedName = cached.matchedName || row.matchedName;
+                row.price = cached.price ?? null;
+                row.planName = cached.planName || null;
+                row.available = cached.available;
+                row.rakutenUrl = cached.rakutenUrl || null;
+                row.errorMsg = null;
+                row.fromCache = true;
+                cachedCount++;
+            });
+
+            if (cachedCount > 0) {
+                statusBar.style.display = "flex";
+                progressTrack.style.display = "none";
+                statusText.textContent = "保存済み結果を表示中";
+                const savedAt = entry.savedAt ? new Date(entry.savedAt).toLocaleString("ja-JP") : "";
+                statusCount.textContent = `${cachedCount}件${savedAt ? `（${savedAt}取得）` : ""}`;
+            } else {
+                statusBar.style.display = "none";
+                progressTrack.style.display = "none";
+            }
+            renderTable();
+        }
+
         const rowState = FACILITIES.map(f => ({
             ...f,
             hotelNo: null,
@@ -572,6 +689,7 @@
             available: null, // true/false/null(未検索)
             rakutenUrl: null,
             errorMsg: null,
+            fromCache: false,
         }));
 
         /* ------------------------------------------------------------------
@@ -728,6 +846,11 @@
                 return;
             }
 
+            const conditionKey = makePriceConditionKey(checkin, checkout, adultNum, mealCondition);
+            resetDisplayedResults();
+            beginPriceCacheRefresh(conditionKey);
+            renderTable();
+
             searchBtn.disabled = true;
             statusBar.style.display = "flex";
             progressTrack.style.display = "block";
@@ -790,6 +913,7 @@
                     row.planName = vac.planName;
                     row.rakutenUrl = vac.url;
                     row.errorMsg = null;
+                    cacheRowResult(conditionKey, row);
                     await sleep(220);
                 } catch (e) {
                     row.errorMsg = "取得エラー: " + e.message;
@@ -981,12 +1105,16 @@
                     const adultNum = document.getElementById("adultNum").value || "2";
                     appId = document.getElementById("appId").value.trim();
                     accessKey = document.getElementById("accessKey").value.trim();
+                    const conditionKey = makePriceConditionKey(checkin, checkout, adultNum, "breakfast,dinner");
                     try {
                         const vac = await fetchVacancy(val, checkin, checkout, adultNum, "breakfast,dinner");
                         rowState[idx].hotelNo = val;
                         rowState[idx].available = vac.available;
                         rowState[idx].price = vac.price;
+                        rowState[idx].planName = vac.planName;
                         rowState[idx].rakutenUrl = vac.url;
+                        rowState[idx].errorMsg = null;
+                        cacheRowResult(conditionKey, rowState[idx]);
                     } catch (e) {
                         rowState[idx].errorMsg = "取得エラー: " + e.message;
                     }
@@ -1084,7 +1212,12 @@
             const month = String(checkoutDate.getMonth() + 1).padStart(2, "0");
             const day = String(checkoutDate.getDate()).padStart(2, "0");
             checkoutEl.value = `${year}-${month}-${day}`;
+            applyCachedResults();
         });
+
+        checkoutEl.addEventListener("change", applyCachedResults);
+        document.getElementById("adultNum").addEventListener("change", applyCachedResults);
+        applyCachedResults();
 
     </script>
 </body>
