@@ -421,10 +421,11 @@
                     <label for="accessKey">アクセスキー</label>
                     <input type="text" id="accessKey" placeholder="アプリ管理画面の「アクセスキー」欄">
                 </div>
-                <button class="ghost tiny" id="saveAppId" type="button">このセッションで使う</button>
+                <button class="ghost tiny" id="saveAppId" type="button">保存</button>
+                <button class="ghost tiny" id="clearAppId" type="button" style="color:var(--clay);">保存データを削除</button>
                 <div class="note" style="flex-basis:100%;">
                     未取得の場合は <a href="https://webservice.rakuten.co.jp/" target="_blank" rel="noopener">楽天ウェブサービス</a>
-                    で無料登録してください(即時発行)。アプリの管理画面に「アプリID」と「アクセスキー」の両方が表示されるので、両方コピーしてください。入力した値はこの画面を閉じると消えます。
+                    で無料登録してください(即時発行)。入力したアプリID・アクセスキーはお使いのブラウザ（ローカルストレージ）に自動保存され、次回アクセス時も自動入力されます。
                 </div>
             </div>
             <div class="note" id="testLinkWrap"
@@ -443,7 +444,7 @@
                 </div>
                 <div class="field">
                     <label for="checkout">チェックアウト <span id="nightsLabel" style="color:var(--moss);font-weight:600;">(1泊)</span></label>
-                    <input type="date" id="checkout" disabled>
+                    <input type="date" id="checkout">
                 </div>
                 <div class="field">
                     <label for="adultNum">大人人数</label>
@@ -566,6 +567,30 @@
         let appId = "";
         let accessKey = "";
         const hotelNoCache = {}; // facility index -> resolved hotelNo (or null)
+        const STORAGE_KEY_APP_ID = "hoyoujo_app_id";
+        const STORAGE_KEY_ACCESS_KEY = "hoyoujo_access_key";
+
+        function saveCredentials(id, key) {
+            id = (id || "").trim();
+            key = (key || "").trim();
+            if (!id && !key) return;
+            try {
+                localStorage.setItem(STORAGE_KEY_APP_ID, id);
+                localStorage.setItem(STORAGE_KEY_ACCESS_KEY, key);
+            } catch (e) {
+                console.warn("LocalStorage save failed", e);
+            }
+        }
+
+        function clearCredentials() {
+            try {
+                localStorage.removeItem(STORAGE_KEY_APP_ID);
+                localStorage.removeItem(STORAGE_KEY_ACCESS_KEY);
+            } catch (e) {
+                console.warn("LocalStorage clear failed", e);
+            }
+        }
+
         const PRICE_DB_STORAGE_KEY = "hoyoujo-price-db-v1";
 
         // 検索条件ごとの料金結果をブラウザのlocalStorageに保存する簡易DB
@@ -938,6 +963,7 @@
                 alert("先にアプリIDとアクセスキーの両方を入力してください。");
                 return;
             }
+            saveCredentials(id, key);
             hintEl.innerHTML = `<span style="color:var(--muted);">通信テスト中...</span>`;
             const testUrl = "https://openapi.rakuten.co.jp/engine/api/Travel/KeywordHotelSearch/20170426"
                 + "?applicationId=" + encodeURIComponent(id)
@@ -960,10 +986,40 @@
         });
 
         searchBtn.addEventListener("click", runSearch);
+
         document.getElementById("saveAppId").addEventListener("click", () => {
             appId = document.getElementById("appId").value.trim();
             accessKey = document.getElementById("accessKey").value.trim();
-            alert((appId && accessKey) ? "このセッションでアプリID・アクセスキーを使用します。" : "アプリIDとアクセスキーの両方を入力してください。");
+            if (appId && accessKey) {
+                saveCredentials(appId, accessKey);
+                const hint = document.getElementById("testLinkResultHint");
+                if (hint) {
+                    hint.innerHTML = `<span style="color:#059669;font-weight:600;">✓ ローカルストレージに保存しました</span>`;
+                }
+                alert("アプリIDとアクセスキーをブラウザに保存しました。次回アクセス時も自動入力されます。");
+            } else {
+                alert("アプリIDとアクセスキーの両方を入力してください。");
+            }
+        });
+
+        document.getElementById("clearAppId").addEventListener("click", () => {
+            clearCredentials();
+            document.getElementById("appId").value = "";
+            document.getElementById("accessKey").value = "";
+            appId = "";
+            accessKey = "";
+            const hint = document.getElementById("testLinkResultHint");
+            if (hint) {
+                hint.innerHTML = `<span style="color:var(--muted);">保存データを削除しました</span>`;
+            }
+            alert("保存していたアプリIDとアクセスキーを削除しました。");
+        });
+
+        document.getElementById("appId").addEventListener("change", () => {
+            saveCredentials(document.getElementById("appId").value, document.getElementById("accessKey").value);
+        });
+        document.getElementById("accessKey").addEventListener("change", () => {
+            saveCredentials(document.getElementById("appId").value, document.getElementById("accessKey").value);
         });
 
         /* ------------------------------------------------------------------
@@ -1124,44 +1180,57 @@
         }
 
         /* ------------------------------------------------------------------
-           ローカル環境での .env / env.js 自動読み込み
+           ローカルストレージおよびローカル設定 (.env / env.js) からの自動読み込み
         ------------------------------------------------------------------- */
-        async function loadLocalEnv() {
+        async function loadCredentials() {
             let loadedAppId = "";
             let loadedAccessKey = "";
             let source = "";
 
-            // 1. env.js (window.__ENV__) からの読み込み (file:// またはローカル環境)
-            if (window.__ENV__) {
+            // 1. ローカルストレージからの読み込み (ブラウザ永続化)
+            try {
+                const sId = localStorage.getItem(STORAGE_KEY_APP_ID);
+                const sKey = localStorage.getItem(STORAGE_KEY_ACCESS_KEY);
+                if (sId) loadedAppId = sId.trim();
+                if (sKey) loadedAccessKey = sKey.trim();
+                if (loadedAppId || loadedAccessKey) source = "ローカルストレージ";
+            } catch (e) {
+                console.warn("LocalStorage access failed", e);
+            }
+
+            // 2. env.js (window.__ENV__) からの読み込み (ローカル環境設定)
+            if (!loadedAppId && !loadedAccessKey && window.__ENV__) {
                 if (window.__ENV__.APPLICATION_ID) loadedAppId = String(window.__ENV__.APPLICATION_ID).trim();
                 if (window.__ENV__.ACCESS_KEY) loadedAccessKey = String(window.__ENV__.ACCESS_KEY).trim();
                 if (loadedAppId || loadedAccessKey) source = "env.js";
             }
 
-            // 2. ローカルサーバー(http://)経由の場合は fetch('.env') で最新の .env を直接読み込み
-            try {
-                const res = await fetch("./.env", { cache: "no-store" });
-                if (res.ok) {
-                    const text = await res.text();
-                    const lines = text.split(/\r?\n/);
-                    for (const line of lines) {
-                        const trimmed = line.trim();
-                        if (!trimmed || trimmed.startsWith("#")) continue;
-                        const match = trimmed.match(/^([^=]+)=(.*)$/);
-                        if (match) {
-                            const key = match[1].trim();
-                            const val = match[2].trim().replace(/^["']|["']$/g, "");
-                            if (key === "APPLICATION_ID") loadedAppId = val;
-                            if (key === "ACCESS_KEY") loadedAccessKey = val;
+            // 3. ローカルサーバー(http://)経由の場合は fetch('.env') で最新の .env を直接読み込み
+            if (!loadedAppId && !loadedAccessKey) {
+                try {
+                    const res = await fetch("./.env", { cache: "no-store" });
+                    if (res.ok) {
+                        const text = await res.text();
+                        const lines = text.split(/\r?\n/);
+                        for (const line of lines) {
+                            const trimmed = line.trim();
+                            if (!trimmed || trimmed.startsWith("#")) continue;
+                            const match = trimmed.match(/^([^=]+)=(.*)$/);
+                            if (match) {
+                                const key = match[1].trim();
+                                const val = match[2].trim().replace(/^["']|["']$/g, "");
+                                if (key === "APPLICATION_ID") loadedAppId = val;
+                                if (key === "ACCESS_KEY") loadedAccessKey = val;
+                            }
                         }
+                        if (loadedAppId || loadedAccessKey) source = ".env";
                     }
-                    if (loadedAppId || loadedAccessKey) source = ".env";
+                } catch (_) {
+                    // file:// や CORS 制限時は無視
                 }
-            } catch (_) {
-                // file:// や CORS 制限時は無視
             }
 
-            // 3. 値を入力フィールドおよびスクリプト変数に反映
+            // 4. 値を入力フィールドおよびスクリプト変数に反映
             if (loadedAppId) {
                 const appIdEl = document.getElementById("appId");
                 if (appIdEl) appIdEl.value = loadedAppId;
@@ -1176,7 +1245,7 @@
             if (loadedAppId && loadedAccessKey) {
                 const hint = document.getElementById("testLinkResultHint");
                 if (hint) {
-                    hint.innerHTML = `<span style="color:#059669;font-weight:600;">✓ ローカル設定 (${source}) からアプリID・アクセスキーを自動読み込みしました</span>`;
+                    hint.innerHTML = `<span style="color:#059669;font-weight:600;">✓ ${source} からアプリID・アクセスキーを自動読み込みしました</span>`;
                 }
             }
         }
@@ -1184,38 +1253,76 @@
         /* 初期化 */
         initFilters();
         renderTable();
-        loadLocalEnv();
+        loadCredentials();
 
-        /* デフォルト日付(明日〜明後日)をセット */
+        /* デフォルト日付・泊数固定ロジック */
         const checkinEl = document.getElementById("checkin");
         const checkoutEl = document.getElementById("checkout");
+        const nightsLabel = document.getElementById("nightsLabel");
         const dateToMs = value => {
             const [year, month, day] = value.split("-").map(Number);
             return new Date(year, month - 1, day).getTime();
         };
         const msPerDay = 24 * 60 * 60 * 1000;
-        const fixedNights = 1;
+        let currentNights = 1;
+
+        function updateNightsDisplay() {
+            const inMs = dateToMs(checkinEl.value);
+            const outMs = dateToMs(checkoutEl.value);
+            if (inMs && outMs) {
+                const diff = Math.round((outMs - inMs) / msPerDay);
+                if (diff > 0) {
+                    currentNights = diff;
+                }
+            }
+            if (nightsLabel) {
+                nightsLabel.textContent = `(${currentNights}泊)`;
+            }
+        }
 
         (function setDefaultDates() {
             const d1 = new Date(); d1.setDate(d1.getDate() + 1);
-            const d2 = new Date(); d2.setDate(d2.getDate() + 2);
+            const d2 = new Date(); d2.setDate(d2.getDate() + 1 + currentNights);
             const fmt = d => d.toISOString().slice(0, 10);
             checkinEl.value = fmt(d1);
             checkoutEl.value = fmt(d2);
+            updateNightsDisplay();
         })();
 
-        // チェックイン変更時は、現在の泊数(一泊)を保ったままチェックアウトも移動
-        checkinEl.addEventListener("change", () => {
+        // チェックイン変更時は、現在の泊数を維持してチェックアウトも同日数分移動
+        function handleCheckinChange() {
             if (!checkinEl.value) return;
-            const checkoutDate = new Date(dateToMs(checkinEl.value) + fixedNights * msPerDay);
+            const checkoutDate = new Date(dateToMs(checkinEl.value) + currentNights * msPerDay);
             const year = checkoutDate.getFullYear();
             const month = String(checkoutDate.getMonth() + 1).padStart(2, "0");
             const day = String(checkoutDate.getDate()).padStart(2, "0");
             checkoutEl.value = `${year}-${month}-${day}`;
+            updateNightsDisplay();
+            applyCachedResults();
+        }
+
+        checkinEl.addEventListener("change", handleCheckinChange);
+        checkinEl.addEventListener("input", handleCheckinChange);
+
+        checkoutEl.addEventListener("change", () => {
+            if (!checkinEl.value || !checkoutEl.value) return;
+            const inMs = dateToMs(checkinEl.value);
+            const outMs = dateToMs(checkoutEl.value);
+            const diff = Math.round((outMs - inMs) / msPerDay);
+            if (diff > 0) {
+                currentNights = diff;
+            } else {
+                // チェックイン日以前が選ばれた場合は現在の泊数を維持して補正
+                const newOut = new Date(inMs + currentNights * msPerDay);
+                const year = newOut.getFullYear();
+                const month = String(newOut.getMonth() + 1).padStart(2, "0");
+                const day = String(newOut.getDate()).padStart(2, "0");
+                checkoutEl.value = `${year}-${month}-${day}`;
+            }
+            updateNightsDisplay();
             applyCachedResults();
         });
 
-        checkoutEl.addEventListener("change", applyCachedResults);
         document.getElementById("adultNum").addEventListener("change", applyCachedResults);
         applyCachedResults();
 
